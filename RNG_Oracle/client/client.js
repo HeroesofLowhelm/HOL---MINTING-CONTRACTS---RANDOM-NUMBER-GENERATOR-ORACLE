@@ -106,9 +106,10 @@ async function processRequest (id, callerAddress) {
         try {
             const randomNumber = await getRandom();
             console.log("Received Random Number===========================>", randomNumber);
-            await setRandom(randomNumber, holTWAP, id)
+            await setRandom(callerAddress, randomNumber, id)
             return
         } catch (error) {
+            console.log("error while first step", error);
             if (retries === MAX_RETRIES - 1) {
                 await setRandom(callerAddress,  '0', id)
                 return
@@ -163,7 +164,12 @@ async function setRandom (callerAddress, randomNumber, id) {
 
 async function getRandom() {
     // return uint256 random number
-    return Math.floor(Math.random() * (2**256 - 1));
+    let returnRand = '';
+    for (let i = 0; i < 5 ; i++) {
+        returnRand += (Math.floor(Math.random() * (2**32 - 1))).toString();
+    }
+    console.log(returnRand);
+    return returnRand
 }
 
 (async () => {
