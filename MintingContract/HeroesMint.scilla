@@ -48,6 +48,10 @@ contract HeroesMint
 field oracleAddress: Option ByStr20 = None {ByStr20}
 field heroesNFTAddress: Option ByStr20 = None {ByStr20}
 field myRequests: Map Uint256 Bool = Emp Uint256 Bool
+field requestedCallerCount: Uint256 = Uint256 0
+field processedCallerCount: Uint256 = Uint256 0
+(* Mapping for caller Address id to caller address *)
+field callerAddresses: Map Uint256 ByStr20 = Emp Uint256 ByStr20
 
 (**************************************)
 (*             Procedures             *)
@@ -112,7 +116,7 @@ transition setOracleAddress(oracleAddr : ByStr20)
 end
 
 (* @dev: Transition for users to Mint NFT.This transition invokes requestRandomNumber() transition in the oracle contract   *)
-transition Mint()
+transition MintNFT()
     oracleAddressTmp <- oracleAddress;
     heroesNFTAddressTmp <- heroesNFTAddress;
     match oracleAddressTmp with
@@ -121,7 +125,11 @@ transition Mint()
         | Some heroesValue =>
             msg = {_tag: "requestRandomNumber"; _recipient: v; _amount: zero};
             msgs = one_msg msg;
-            send msgs
+            send msgs;
+            requestedCallerCountTmp <- requestedCallerCount;
+            callerAddresses[requestedCallerCountTmp] := _sender;
+            tmpVal = builtin add requestedCallerCountTmp one;
+            requestedCallerCount := tmpVal
         | None =>
             err = CodeIsNFTContractAddressNotSet;
             ThrowError err
@@ -134,7 +142,7 @@ end
 
 (* @dev: Receive request id from the oracle contract. Only oracle contract allowed to invoke.   *)
 (* param id:      Request id.                                                                   *)
-transition receiveRequestId(id: Uint256)
+transition getRequestId(id: Uint256)
     IsNotOracle _sender;
     myRequests[id] := true;
     e = {_eventname: "ReceivedNewRequestId"; id: id};
@@ -150,10 +158,14 @@ transition callback(randomnumber: Uint256, id: Uint256)
     e = {_eventname: "RandomNumberReceived"; randomnumber: randomnumber};
     event e;
     delete myRequests[id];
+    processedCallerCountTmp <- processedCallerCount;
+    callerAddress <- callerAddresses[processedCallerCountTmp];
+    delete callerAddresses[processedCallerCountTmp];
+    tmpVal = builtin add processedCallerCountTmp one;
     (* Call NFT contract's Mint function with the received random number *)
     (* This contract address must be set as Minter in the NFT Contract *)
     heroesNFTAddressTmp <- heroesNFTAddress;
-    msg = {_tag: "Mint"; _recipient: heroesNFTAddressTmp; _amount: zero; to: };
+    msg = {_tag: "Mint"; _recipient: heroesNFTAddressTmp; _amount: zero; to: callerAddress};
     msgs = one_msg msg;
     send msgs
 end
